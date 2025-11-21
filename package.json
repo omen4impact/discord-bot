@@ -1,10 +1,16 @@
 {
-  "name": "discord-bot",
+  "name": "terptorch-bot",
   "version": "1.0.0",
+  "description": "Discord Bot für TerpTorch mit n8n Webhook Integration",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
-    "discord.js": "^14.11.0",
+    "discord.js": "^15.0.0",
+    "dotenv": "^16.0.0",
     "node-fetch": "^3.3.2",
-    "dotenv": "^16.3.1"
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2"
   }
 }
