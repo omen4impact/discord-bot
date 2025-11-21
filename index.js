@@ -20,30 +20,31 @@ const client = new Client({
   ]
 });
 
-client.once('ready', () => {
-  console.log(`✅ Bot läuft als ${client.user.tag} – nur @mentions aktiv`);
+client.once('clientReady', () => {
+  console.log(`✅ Bot online als ${client.user.tag} – bereit für @mentions`);
 });
 
-// Wenn jemand den Bot mit @ anschreibt
+// === @MENTION ===
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
   if (!message.mentions.has(client.user)) return;
 
-  // Optional: reagier sofort mit Typing, damit User sieht "Bot tippt..."
+  console.log(`\n🎯 NEUE @MENTION von ${message.author.tag} (${message.author.id}) in #${message.channel.name || message.channel.id}`);
+  console.log(`📝 Nachricht: "${message.content}"`);
+
   message.channel.sendTyping();
 
   const payload = {
     type: "message",
     user: message.author.username,
     userId: message.author.id,
-    userTag: message.author.tag,           // z. B. Omen#1234
-    content: message.content.replace(`<@${client.user.id}>`, '').trim(), // bereinigt den @Bot raus
+    userTag: message.author.tag,
+    content: message.content.replace(`<@${client.user.id}>`, '').trim(),
     rawContent: message.content,
-    attachments: message.attachments.map(a => ({ url: a.url, name: a.name })),
+    attachments: message.attachments.map(a => ({ url: a.url, name: a.name })) || [],
     channelId: message.channel.id,
     channelName: message.channel?.name || "DM",
     guildId: message.guild?.id || null,
-    guildName: message.guild?.name || null,
     messageId: message.id
   };
 
@@ -51,53 +52,62 @@ client.on('messageCreate', async (message) => {
     const res = await fetch(N8N_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload, null, 2)
     });
 
-    console.log('➡️ An n8n gesendet – Status:', res.status);
+    console.log(`➡️ An n8n gesendet – Status: ${res.status} ${res.statusText}`);
     if (!res.ok) {
       const text = await res.text();
-      console.error('❌ n8n Fehler:', text);
-      // optional: sofortige Fehlermeldung im Channel
-      message.reply("Irgendwas ist bei mir schiefgelaufen 😓");
+      console.error('❌ n8n hat Fehler zurückgegeben:', text.substring(0, 500));
+    } else {
+      console.log('✅ Payload erfolgreich an n8n übergeben');
     }
   } catch (err) {
-    console.error('❌ Netzwerkfehler zu n8n:', err);
-    message.reply("Kann n8n gerade nicht erreichen 🚨");
+    console.error('🚨 Netzwerkfehler beim Senden an n8n:', err.message);
   }
 });
 
-// Express: n8n schickt die Antwort zurück
+// === EXPRESS – RÜCKANTWORT VON N8N ===
 const app = express();
-app.use(express.json({ limit: '50mb' }));   // für große Bilder/Files
+app.use(express.json({ limit: '50mb' }));
 
 app.post('/discord-response', async (req, res) => {
+  console.log('\n🔙🔙🔙 N8N SCHICKT RÜCKANTWORT! 🔙🔙🔙');
+  console.log('Raw Body:', JSON.stringify(req.body, null, 2));
+
   const { replyTo, message, channelId, embeds, files } = req.body;
 
   if (!channelId || !replyTo) {
-    return res.status(400).json({ error: "channelId & replyTo fehlen" });
+    console.error('❌ FEHLENDE DATEN – replyTo oder channelId fehlt!');
+    return res.status(400).json({ error: "replyTo & channelId required" });
   }
 
   try {
     const channel = await client.channels.fetch(channelId);
+    console.log(`📬 Sende in Channel ${channel.name || channelId} an <@${replyTo}>`);
 
     await channel.send({
       content: message ? `<@${replyTo}> ${message}` : undefined,
       embeds: embeds || undefined,
-      files: files || undefined,                   // falls du Attachments zurückschicken willst
+      files: files || undefined,
       allowedMentions: { users: [replyTo] }
     });
 
-    console.log(`✅ Antwort an <@${replyTo}> in #${channel.name || channelId} gesendet`);
+    console.log('🎉 NACHRICHT ERFOLGREICH IM DISCORD GESENDET!');
     res.json({ success: true });
   } catch (err) {
-    console.error('❌ Fehler beim Senden der Antwort:', err);
+    console.error('💥 FEHLER BEIM SENDEN INS DISCORD:', err.message);
+    console.error(err.stack);
     res.status(500).json({ error: err.message });
   }
 });
 
+// Health-Check (nur damit wir sehen, dass der Server lebt)
+app.get('/', (req, res) => res.send('TerpTorch-Bot läuft – alles gut im Hood!'));
+
 app.listen(PORT, () => {
-  console.log(`Webhook-Server läuft auf Port ${PORT} → /discord-response`);
+  console.log(`🚀 Webhook-Server läuft auf Port ${PORT}`);
+  console.log(`   POST → https://bot.weeel.de/discord-response`);
 });
 
 client.login(BOT_TOKEN);
