@@ -12,7 +12,10 @@ const client = new Client({
 
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 
-client.on('ready', () => console.log(`Logged in as ${client.user.tag}`));
+client.on('clientReady', () => {
+    console.log(`Logged in as ${client.user.tag}`);
+});
+
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
