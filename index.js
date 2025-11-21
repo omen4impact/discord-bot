@@ -1,6 +1,6 @@
 require('dotenv').config(); // lädt .env Variablen
 const { Client, GatewayIntentBits } = require('discord.js');
-const fetch = require('node-fetch'); // für Node <18, ab Node18 kann built-in fetch genutzt werden
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 // n8n Webhook URL aus Environment
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
