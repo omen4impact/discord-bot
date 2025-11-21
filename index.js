@@ -48,7 +48,7 @@ client.on('messageCreate', async (message) => {
                 userId: message.author.id,
                 content: message.content,
                 attachments: message.attachments.map(a => a.url),
-                channel: message.channel.name
+                channel: message.channel.id
             };
 
             const res = await fetch(N8N_WEBHOOK_URL, {
