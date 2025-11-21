@@ -1,22 +1,17 @@
-require('dotenv').config(); // lädt .env Variablen
+require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
+
+// fetch Polyfill für Node <20
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
-// n8n Webhook URL aus Environment
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
-if (!N8N_WEBHOOK_URL) {
-    console.error("⚠️ Bitte N8N_WEBHOOK_URL in .env setzen!");
-    process.exit(1);
-}
-
-// Discord Bot Token aus Environment
 const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) {
-    console.error("⚠️ Bitte BOT_TOKEN in .env setzen!");
+
+if (!N8N_WEBHOOK_URL || !BOT_TOKEN) {
+    console.error("⚠️ Bitte BOT_TOKEN und N8N_WEBHOOK_URL in .env setzen!");
     process.exit(1);
 }
 
-// Discord Client erstellen
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -25,49 +20,50 @@ const client = new Client({
     ]
 });
 
-// Bot ready Event
 client.on('ready', () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-// Nachrichten Event
 client.on('messageCreate', async (message) => {
-    console.log('Message received:', message.content);
-    console.log('Author:', message.author.username);
+    console.log('Nachricht bekommen:', message.content);
+    console.log('Von Benutzer:', message.author.username);
+    console.log('Channel ID:', message.channel.id);
 
-    // eigene Nachrichten ignorieren
     if (message.author.bot) return;
 
-    // Prüfen, ob der Bot erwähnt wurde
     if (message.mentions.has(client.user)) {
-        console.log('⚡ Bot was mentioned! Sending to n8n...');
+        console.log('⚡ Bot wurde erwähnt! Sende Nachricht an n8n...');
+
+        const payload = {
+            user: message.author.username,
+            userId: message.author.id,
+            content: message.content,
+            attachments: message.attachments.map(a => a.url),
+            channel: message.channel.id
+        };
 
         try {
-            const payload = {
-                user: message.author.username,
-                userId: message.author.id,
-                content: message.content,
-                attachments: message.attachments.map(a => a.url),
-                channel: message.channel.id
-            };
-
             const res = await fetch(N8N_WEBHOOK_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
+            console.log('📡 HTTP Status von n8n:', res.status);
+
+            const text = await res.text();
+            console.log('📄 Response Body von n8n:', text);
+
             if (!res.ok) {
-                console.error('❌ Failed to send to n8n:', res.statusText);
+                console.error('❌ Fehler beim Senden an n8n:', res.statusText);
             } else {
-                console.log('✅ Sent to n8n Webhook:', payload);
+                console.log('✅ Nachricht erfolgreich an n8n gesendet:', payload);
             }
 
         } catch (err) {
-            console.error('❌ Error sending to n8n:', err);
+            console.error('❌ Fehler beim Senden an n8n:', err);
         }
     }
 });
 
-// Bot starten
 client.login(BOT_TOKEN);
